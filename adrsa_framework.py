@@ -14,6 +14,8 @@ logging.basicConfig(
     level=LOG_LEVEL,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("adrsa_framework")
 
 class Polarity(Enum):
@@ -70,7 +72,6 @@ class ADRSAAgent:
                 results.extend(label_pairs)
             except Exception:
                 logger.exception("Unexpected error while processing sentence %d; skipping to next", idx)
-                # continue to next sentence without raising
                 continue
 
         logger.info("Processing complete. Total aspect-polarity pairs: %d", len(results))
@@ -233,18 +234,15 @@ class ADRSAAgent:
             logger.debug("Empty preprocessing response; returning empty sentence list")
             return []
 
-        # Try to extract a clean JSON block first
         json_block = self._extract_json_from_text(response)
         if json_block:
             try:
                 parsed = json.loads(json_block)
                 if isinstance(parsed, list):
                     return [s.strip() for s in parsed if isinstance(s, str) and s.strip()]
-                # if it's a single string or other, fall through to regex
             except Exception:
                 logger.debug("Extracted JSON block failed to parse; falling back to regex/split")
 
-        # Final fallback: naive sentence split
         logger.debug("Falling back to regex sentence split for preprocessing response")
         return [s.strip() for s in re.split(r'[.!?]+', response) if s.strip()]
     
@@ -345,7 +343,6 @@ class ADRSAAgent:
                     if isinstance(pair, dict):
                         polarity_raw = pair.get('polarity')
 
-                    # Normalize polarity into Polarity enum; default to NEUTRAL on unknown
                     polarity_value = None
                     if isinstance(polarity_raw, str):
                         normalized = polarity_raw.strip().lower()
@@ -395,7 +392,6 @@ class ADRSAAgent:
         if not text:
             return None
 
-        # Quick try: full text
         try:
             json.loads(text)
             return text
